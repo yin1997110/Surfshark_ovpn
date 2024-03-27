@@ -15,6 +15,7 @@ class DownConfig():
         }
         self.FileUrl = "https://my.shark-china.com/vpn/p_api/v1/server/configurations?unrestricted=1"
         self.code = 9   #如果为9 未初始化 如果未 0 则成功 为 1则失败
+        self.filepath = ""
 
 
     def run(self):
@@ -26,10 +27,10 @@ class DownConfig():
             self.down()
     def down(self):
         #开始下载文件
-        SaveFileName = os.path.join(self.Cwd,"down.zip")
+        self.filepath = os.path.join(self.Cwd,"down.zip")
         response = requests.get(self.FileUrl,headers=self.headers)
         if response.status_code == 200:  #判断是否能正常访问
-            with open(SaveFileName, 'wb') as file:
+            with open(self.filepath, 'wb') as file:
                 #保存文件
                 file.write(response.content)
                 self.code = 0
