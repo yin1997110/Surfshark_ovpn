@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import shutil
 import ConnectConf
 from concurrent.futures import ThreadPoolExecutor
+import re
+import time
 
 
 class spider():
@@ -166,26 +168,52 @@ class spider():
     def FileComparison(self):
         #获取directory目录所有配置文档的IP和端口
         self.directoryconf = getconfinfo.process_ovpn_directory(self.confdirs)
+        #此时保存格式为 "IP:端口":"文件地址"
+
+
         print((datetime.utcnow() + timedelta(hours=8)).strftime('%Y-%m-%d-%H-%M-%S') + f"获取{len(self.directoryconf)}个配置项!")
         print((datetime.utcnow() + timedelta(hours=8)).strftime('%Y-%m-%d-%H-%M-%S') + "开始对比文件")
+
 
         #获取temp目录所有配置文档的IP和端口
         self.tempconf = getconfinfo.process_ovpn_directory(self.temp_directory)
 
         #进行对比
-        for temp_ip_port, temp_file_path in self.tempconf.items():
-            for direct_ip_port, direct_file_path in self.directoryconf.items():
-                if temp_ip_port == direct_ip_port:
-                    os.remove(direct_file_path)
+        for temp_ip_port, temp_file_path in self.tempconf.items():   #开始循环temp内得ip和端口
+            for direct_ip_port, direct_file_path in self.directoryconf.items():   #然后循环所有主文件得地址和端口
+                if temp_ip_port == direct_ip_port:   #如果找到相匹配项
+                    os.remove(direct_file_path)     #删除主文件得匹配项
                     print("删除:" + direct_file_path)
 
 
         #把整个time目录内的文件都拷贝到directory目录
+        #遇到新的问题 文件名一样IP不一样
         for file in os.listdir(self.temp_directory):
-            print((datetime.utcnow() + timedelta(hours=8)).strftime(
-                '%Y-%m-%d-%H-%M-%S') + ":从temp目录移动文件:" + os.path.join(os.getcwd(), "temp", file),
-                  os.path.join(os.getcwd(), "directory") + "到directory")
-            shutil.move(os.path.join(os.getcwd(), "temp", file), os.path.join(os.getcwd(), "directory"))
+            path_file = os.path.join(os.getcwd(), "temp", file)  #源文件
+            ip = ""
+            port = ""
+            #获取IP和port来定义新得文件名
+            with open(path_file, "r") as file:
+                content = file.read()
+                ip_port_match = re.search(r"remote\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\s+(\d+)", content)  #获取IP和port
+                if ip_port_match:
+                    ip = ip_port_match.group(1)
+                    port = ip_port_match.group(2)
+
+            #定义新的文件名
+            new_name = f"{ip}---{port}--{str(int(time.time()))}.ovpn"
+            os.rename(path_file,os.path.join(os.getcwd(), "temp",new_name))
+            source_path = os.path.join(os.getcwd(), "temp", new_name)
+            destination_path = os.path.join(os.getcwd(), "directory", new_name)
+
+            print((datetime.utcnow() + timedelta(hours=8)).strftime('%Y-%m-%d-%H-%M-%S') + ":从temp目录移动文件:" + source_path +"到"+ destination_path)
+
+            if os.path.exists(destination_path):
+                os.remove(destination_path)  # 如果目标路径已存在，则删除它
+
+            shutil.move(source_path, destination_path)   #复制文件内容
+
+
 
         # 删除目录
         shutil.rmtree(self.temp_directory, ignore_errors=True)  # 删除目录
