@@ -16,6 +16,7 @@ class spider():
         self.temp_directory = os.path.join(os.getcwd(), "temp")  #设置临时缓存目录
         self.directoryconf = {}
         self.tempconf = {}
+        self.fileconnect = []
     def run(self):
         #第一步 文件下载
         downfile = DownFile.DownConfig()
@@ -40,17 +41,44 @@ class spider():
 
         #开始执行连接操作
         self.connectcfg()
+        self.copyfile()
+
+    def copyfile(self):
+        for file in self.fileconnect:
+            filename = file.split("/")
+            groups = filename[-1].split("---")
+            city_path = os.path.join(os.getcwd(), "ovpn", groups[0],groups[1])
+            newfilename = os.path.join(city_path,filename[-1])
+
+            os.makedirs(city_path, exist_ok=True)
+            #正在放置文件
+            shutil.copyfile(file, newfilename)
+
+
 
     def process_file(self, file_path):
         con = ConnectConf.Connect_file(file_path)
         con.connect()
         if con.code == 0:
+            print(f"\033[92m连接成功:{con.FilePath}\033[0m")
             # 修改名字
-            self.xgfilename(con.FilePath, con.hostname, con.ip, con.port)
+            # 并且把文件放到指定目录
+            self.xgfilename(file_path, con.hostname, con.ip, con.port)
+
         else:
-            print(f"{con.FilePath}: 链接失败")
+            print(f"\033[91m连接失败:{con.FilePath}\033[0m")
 
     def connectcfg(self):
+        #0.检测ovpn目录是否存在
+        # 如果放到多线程内  可能会成为出发已存在但是检测不到的情况
+        ovpnpath = os.path.join(os.getcwd(),"ovpn")
+        if not os.path.exists(ovpnpath):
+            print(f"目录 ovpn 不存在，正在创建...")
+            os.makedirs(ovpnpath)
+        else:
+            pass
+
+
         #1.获取所有文件地址
         ovpn_files = [os.path.join(self.confdirs, file_name) for file_name in os.listdir(self.confdirs) if
                       file_name.endswith('.ovpn')]
@@ -155,25 +183,8 @@ class spider():
         #给文件改名
         new_file_path = os.path.join(self.confdirs,new_name)  #新文件得地址
         os.rename(path, new_file_path)  #修改文件名字
+        self.fileconnect.append(new_file_path)
 
-        #判断目录是否存在
-        ovpnpath = os.path.join(os.getcwd(),"ovpn")
-        if not os.path.exists(ovpnpath):
-            print(f"目录 ovpn 不存在，正在创建...")
-            os.makedirs(ovpnpath)
-
-        #检测目标目录是否存在
-        country_path = os.path.join(ovpnpath,country_name)
-        city_path = os.path.join(country_path, city_name)
-        if not os.path.exists(ovpnpath):
-            print("国家名目录不存在 正在创建...")
-            os.makedirs(country_path)
-            if not os.path.exists(city_path):
-                print("城市名目录不存在 正在创建...")
-                os.makedirs(city_path)
-                # 拷贝文件到目标目录
-                ovpn_file_path = os.path.join(city_path, new_name)
-                shutil.copyfile(new_file_path, ovpn_file_path)
 
     def FileComparison(self):
         #获取directory目录所有配置文档的IP和端口
