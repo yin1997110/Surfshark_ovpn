@@ -38,19 +38,29 @@ class spider():
         else:
             print("从云端下载文件失败")
 
-        #不管下载成功还是失败 都要执行链接Openvpn的操作
+        #开始执行连接操作
+        self.connectcfg()
+
+    def process_file(self, file_path):
+        con = ConnectConf.Connect_file(file_path)
+        con.connect()
+        if con.code == 0:
+            # 修改名字
+            self.xgfilename(con.FilePath, con.hostname, con.ip, con.port)
+        else:
+            print(f"{con.FilePath}: 链接失败")
+
+    def connectcfg(self):
+        #1.获取所有文件地址
         ovpn_files = [os.path.join(self.confdirs, file_name) for file_name in os.listdir(self.confdirs) if
                       file_name.endswith('.ovpn')]
-        results = []
+        #2.执行线程操作
         with ThreadPoolExecutor(max_workers=50) as executor:
-            for file_path in ovpn_files:
-                con = ConnectConf.Connect_file(file_path)
-                con.connect()
-                if con.code == 0:
-                    #修改名字
-                    self.xgfilename(con.FilePath, con.hostname, con.ip, con.port)
-                else:
-                    print(f"{con.FilePath}:链接失败")
+            # 提交任务并获取结果
+            results = [executor.submit(self.process_file, file_path) for file_path in ovpn_files]
+            for result in results:
+                result.result()  # 等待任务完成
+
 
     def xgfilename(self,path,hostname,ip,port):
         #定义国家和城市
